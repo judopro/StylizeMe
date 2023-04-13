@@ -10,6 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
+import os
+import sys
+from urllib.parse import urlparse
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -76,10 +79,36 @@ WSGI_APPLICATION = 'stylizeme_prj.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    },
 }
+
+if 'test' in sys.argv or 'test_coverage' in sys.argv: 
+    DATABASES['default']['ENGINE'] = 'django.db.backends.sqlite3'
+else:
+    try:
+        if 'STYLIZEME_DATABASE_URL' in os.environ:
+            url = urlparse(os.environ['STYLIZEME_DATABASE_URL'], scheme='postgres')
+
+            # Ensure default database exists.
+            DATABASES['default'] = DATABASES.get('default', {})
+
+            # Update with environment configuration.
+            DATABASES['default'].update({
+                'NAME': url.path[1:],
+                'USER': url.username,
+                'PASSWORD': url.password,
+                'HOST': url.hostname,
+                'PORT': url.port,
+            })
+
+            if url.scheme == 'postgres':
+                DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql_psycopg2'
+
+        else:
+            raise Exception("DATABASE_URL is not found in environment variables.")
+
+    except Exception:
+        print('Unexpected error:'+str(sys.exc_info()))
 
 
 # Password validation
@@ -122,3 +151,5 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = "stylizeme_site.CustomUser"
